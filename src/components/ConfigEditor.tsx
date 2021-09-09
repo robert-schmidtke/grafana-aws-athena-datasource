@@ -43,7 +43,7 @@ const regions: Array<SelectableValue<string>> = [
   'us-isob-east-1',
   'us-west-1',
   'us-west-2',
-].map(r => {
+].map((r) => {
   return { label: r, value: r };
 });
 
@@ -67,10 +67,10 @@ export class ConfigEditor extends PureComponent<Props> {
               <InlineFormLabel className="width-14">Auth Provider</InlineFormLabel>
               <Select
                 className="width-30"
-                value={authProviderOptions.find(authProvider => authProvider.value === options.jsonData.authType)}
+                value={authProviderOptions.find((authProvider) => authProvider.value === options.jsonData.authType)}
                 options={authProviderOptions}
                 defaultValue={options.jsonData.authType}
-                onChange={option => {
+                onChange={(option) => {
                   if (options.jsonData.authType === 'arn' && option.value !== 'arn') {
                     delete this.props.options.jsonData.assumeRoleArn;
                   }
@@ -194,7 +194,7 @@ export class ConfigEditor extends PureComponent<Props> {
               </InlineFormLabel>
               <Select
                 className="width-30"
-                value={regions.find(region => region.value === options.jsonData.defaultRegion)}
+                value={regions.find((region) => region.value === options.jsonData.defaultRegion)}
                 options={regions}
                 defaultValue={options.jsonData.defaultRegion}
                 onChange={onUpdateDatasourceJsonDataOptionSelect(this.props, 'defaultRegion')}

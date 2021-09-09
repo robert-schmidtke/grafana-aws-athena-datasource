@@ -20,7 +20,7 @@ export class DataSource extends DataSourceWithBackend<AwsAthenaQuery, AwsAthenaO
     query.cacheDuration = query.cacheDuration || '';
     if (typeof query.queryString === 'undefined' || query.queryString === '') {
       query.queryExecutionId = templateSrv.replace(query.queryExecutionId, scopedVars);
-      query.inputs = query.queryExecutionId.split(/,/).map(id => {
+      query.inputs = query.queryExecutionId.split(/,/).map((id) => {
         return {
           queryExecutionId: id,
         };
@@ -36,7 +36,7 @@ export class DataSource extends DataSourceWithBackend<AwsAthenaQuery, AwsAthenaO
 
   async getRegionOptions(): Promise<Array<SelectableValue<string>>> {
     const regions = await this.getRegions();
-    return regions.map(name => ({ label: name, value: name } as SelectableValue<string>));
+    return regions.map((name) => ({ label: name, value: name } as SelectableValue<string>));
   }
 
   async getRegions(): Promise<string[]> {
@@ -45,7 +45,7 @@ export class DataSource extends DataSourceWithBackend<AwsAthenaQuery, AwsAthenaO
 
   async getWorkgroupNameOptions(region: string): Promise<Array<SelectableValue<string>>> {
     const workgroupNames = await this.getWorkgroupNames(region);
-    return workgroupNames.map(name => ({ label: name, value: name } as SelectableValue<string>));
+    return workgroupNames.map((name) => ({ label: name, value: name } as SelectableValue<string>));
   }
 
   async getWorkgroupNames(region: string): Promise<string[]> {
@@ -66,7 +66,7 @@ export class DataSource extends DataSourceWithBackend<AwsAthenaQuery, AwsAthenaO
     const templateSrv = getTemplateSrv();
     const to = new Date(parseInt(templateSrv.replace('$__to'), 10)).toISOString();
     const queryExecutions = await this.getQueryExecutions(region, -1, '.*', workgroup, to);
-    return queryExecutions.map(e => {
+    return queryExecutions.map((e) => {
       const id = e.QueryExecutionId;
       const query = e.Query;
       const completionDateTime = e.Status.CompletionDateTime;
@@ -117,7 +117,7 @@ export class DataSource extends DataSourceWithBackend<AwsAthenaQuery, AwsAthenaO
     const regionsQuery = query.match(/^regions\(\)/);
     if (regionsQuery) {
       const regions = await this.getRegions();
-      return regions.map(n => {
+      return regions.map((n) => {
         return { text: n, value: n };
       });
     }
@@ -126,7 +126,7 @@ export class DataSource extends DataSourceWithBackend<AwsAthenaQuery, AwsAthenaO
     if (workgroupNamesQuery) {
       const region = templateSrv.replace(workgroupNamesQuery[1]);
       const workgroupNames = await this.getWorkgroupNames(region);
-      return workgroupNames.map(n => {
+      return workgroupNames.map((n) => {
         return { text: n, value: n };
       });
     }
@@ -143,7 +143,7 @@ export class DataSource extends DataSourceWithBackend<AwsAthenaQuery, AwsAthenaO
       }
       workGroup = templateSrv.replace(workGroup);
       const namedQueryNames = await this.getNamedQueryNames(region, workGroup);
-      return namedQueryNames.map(n => {
+      return namedQueryNames.map((n) => {
         return { text: n, value: n };
       });
     }
@@ -161,7 +161,7 @@ export class DataSource extends DataSourceWithBackend<AwsAthenaQuery, AwsAthenaO
       }
       workGroup = templateSrv.replace(workGroup);
       const namedQueryQueries = await this.getNamedQueryQueries(region, pattern, workGroup);
-      return namedQueryQueries.map(n => {
+      return namedQueryQueries.map((n) => {
         return { text: n, value: n };
       });
     }
@@ -182,7 +182,7 @@ export class DataSource extends DataSourceWithBackend<AwsAthenaQuery, AwsAthenaO
       const to = new Date(parseInt(templateSrv.replace('$__to'), 10)).toISOString();
 
       const queryExecutions = await this.getQueryExecutions(region, limit, pattern, workGroup, to);
-      return queryExecutions.map(n => {
+      return queryExecutions.map((n) => {
         const id = n.QueryExecutionId;
         return { text: id, value: id };
       });
@@ -206,7 +206,7 @@ export class DataSource extends DataSourceWithBackend<AwsAthenaQuery, AwsAthenaO
       const to = new Date(parseInt(templateSrv.replace('$__to'), 10)).toISOString();
 
       const queryExecutionsByName = await this.getQueryExecutionsByName(region, limit, pattern, workGroup, to);
-      return queryExecutionsByName.map(n => {
+      return queryExecutionsByName.map((n) => {
         const id = n.QueryExecutionId;
         return { text: id, value: id };
       });
