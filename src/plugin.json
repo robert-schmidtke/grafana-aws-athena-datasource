@@ -13,7 +13,7 @@
   "info": {
     "description": "AWS Athena datasource",
     "author": {
-      "name": "Mitsuhiro Tanda"
+      "name": "Mitsuhiro Tanda, Robert Schmidtke"
     },
     "links": [
       {
@@ -21,15 +21,19 @@
         "url": "https://github.com/mtanda/grafana-aws-athena-datasource"
       },
       {
+        "name": "GitHub Fork",
+        "url": "https://github.com/robert-schmidtke/grafana-aws-athena-datasource"
+      },
+      {
         "name": "Apache License",
         "url": "https://github.com/mtanda/grafana-aws-athena-datasource/blob/master/LICENSE"
       }
     ],
-    "version": "2.2.7",
-    "updated": "2020-08-03"
+    "version": "2.2.8",
+    "updated": "2021-09-09"
   },
   "dependencies": {
-    "grafanaVersion": "7.x.x",
+    "grafanaVersion": "7.5.10",
     "plugins": []
   }
 }
