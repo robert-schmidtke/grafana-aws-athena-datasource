@@ -1,4 +1,5 @@
 # grafana-aws-athena-datasource
+Adds support for dashboard variables, using default region and default workgroup from the datasource configuration.
 
 ## Building
 ```
