@@ -111,7 +111,7 @@ export class DataSource extends DataSourceWithBackend<AwsAthenaQuery, AwsAthenaO
     )['query_executions_by_name'];
   }
 
-  async metricFindQuery?(query: any, options?: any): Promise<MetricFindValue[]> {
+  async metricFindQuery?(query: string, options?: any): Promise<MetricFindValue[]> {
     const templateSrv = getTemplateSrv();
 
     const regionsQuery = query.match(/^regions\(\)/);
