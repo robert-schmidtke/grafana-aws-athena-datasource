@@ -1,5 +1,9 @@
 # grafana-aws-athena-datasource
-Adds support for dashboard variables, using default region and default workgroup from the datasource configuration.
+- Adds default workgroup to datasource configuration.
+- Adds support for dashboard variables, using default region and default workgroup from the datasource configuration.
+- Adds a lot more debug logging.
+- Builds on Go 1.17
+- Targets Grafana 7.5.10
 
 ## Building
 Also checkout `.github/workflows/go.yml`.
