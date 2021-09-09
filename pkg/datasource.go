@@ -79,6 +79,7 @@ func NewDataSource(mux *http.ServeMux) *AwsAthenaDatasource {
 	prometheus.MustRegister(metrics.dataScannedBytesTotal)
 	ds.metrics = metrics
 
+	mux.HandleFunc("/variable_query", ds.handleVariableQuery)
 	mux.HandleFunc("/regions", ds.handleResourceRegions)
 	mux.HandleFunc("/workgroup_names", ds.handleResourceWorkgroupNames)
 	mux.HandleFunc("/named_query_names", ds.handleResourceNamedQueryNames)
@@ -142,6 +143,11 @@ func (ds *AwsAthenaDatasource) QueryData(ctx context.Context, tsdbReq *backend.Q
 		if target.Region == "default" || target.Region == "" {
 			target.Region = dsInfo.DefaultRegion
 		}
+
+		if target.WorkGroup == "default" || target.WorkGroup == "" {
+			target.WorkGroup = dsInfo.DefaultWorkgroup
+		}
+
 		target.client = svc
 		target.cache = ds.cache
 		target.metrics = ds.metrics
@@ -430,6 +436,81 @@ func writeResult(rw http.ResponseWriter, path string, val interface{}, err error
 		code = http.StatusInternalServerError
 	}
 	rw.WriteHeader(code)
+}
+
+func (ds *AwsAthenaDatasource) handleVariableQuery(rw http.ResponseWriter, req *http.Request) {
+	backend.Logger.Debug("Received resource call", "url", req.URL.String(), "method", req.Method)
+	if req.Method != http.MethodGet {
+		return
+	}
+	req.ParseForm()
+
+	ctx := req.Context()
+	pluginContext := httpadapter.PluginConfigFromContext(ctx)
+
+	dsSettings := map[string]string{}
+	json.Unmarshal(pluginContext.DataSourceInstanceSettings.JSONData, &dsSettings)
+
+	queryStrings := req.Form["query"]
+	if len(queryStrings) != 1 {
+		writeResult(rw, "?", nil, errors.New("expected single query"))
+		return
+	}
+
+	regions := req.Form["region"]
+	if len(regions) != 1 {
+		writeResult(rw, "?", nil, errors.New("expected single region"))
+		return
+	}
+
+	workGroups := req.Form["workGroup"]
+	if len(workGroups) != 1 {
+		writeResult(rw, "?", nil, errors.New("expected single workGroup"))
+		return
+	}
+
+	target := AwsAthenaQuery{
+		QueryString:    queryStrings[0],
+		Region:         regions[0],
+		WorkGroup:      workGroups[0],
+		OutputLocation: dsSettings["outputLocation"],
+	}
+
+	svc, err := ds.getClient(pluginContext.DataSourceInstanceSettings, target.Region)
+	if err != nil {
+		writeResult(rw, "?", nil, err)
+		return
+	}
+	dsInfo, err := ds.getDsInfo(pluginContext.DataSourceInstanceSettings, target.Region)
+	if err != nil {
+		writeResult(rw, "?", nil, err)
+		return
+	}
+	if target.Region == "default" || target.Region == "" {
+		target.Region = dsInfo.DefaultRegion
+	}
+
+	target.client = svc
+	target.cache = ds.cache
+	target.metrics = ds.metrics
+	target.datasourceID = pluginContext.DataSourceInstanceSettings.ID
+
+	results, err := target.getQueryResults(ctx, pluginContext)
+	if err != nil {
+		writeResult(rw, "?", nil, err)
+		return
+	}
+
+	rows := make([][]string, len(results.ResultSet.Rows))
+	for i, row := range results.ResultSet.Rows {
+		columns := make([]string, len(row.Data))
+		for j, column := range row.Data {
+			columns[j] = *column.VarCharValue
+		}
+		rows[i] = columns
+	}
+
+	writeResult(rw, "results", rows, nil)
 }
 
 func (ds *AwsAthenaDatasource) handleResourceRegions(rw http.ResponseWriter, req *http.Request) {

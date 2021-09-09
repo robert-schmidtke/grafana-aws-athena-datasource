@@ -203,6 +203,19 @@ export class ConfigEditor extends PureComponent<Props> {
           </div>
           <div className="gf-form-inline">
             <div className="gf-form">
+              <InlineFormLabel className="width-14" tooltip="Specify the workgroup, must have a size limit.">
+                Default Workgroup
+              </InlineFormLabel>
+              <Input
+                className="width-30"
+                placeholder="primary"
+                value={options.jsonData.defaultWorkgroup}
+                onChange={onUpdateDatasourceJsonDataOption(this.props, 'defaultWorkgroup')}
+              />
+            </div>
+          </div>
+          <div className="gf-form-inline">
+            <div className="gf-form">
               <InlineFormLabel className="width-14">Output Location</InlineFormLabel>
               <div className="width-30">
                 <Input
