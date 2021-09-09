@@ -2,6 +2,8 @@
 Adds support for dashboard variables, using default region and default workgroup from the datasource configuration.
 
 ## Building
+Also checkout `.github/workflows/go.yml`.
+
 ```
 # Download and install golang: https://golang.org/doc/install
 sudo apt install nodejs
