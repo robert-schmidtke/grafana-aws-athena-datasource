@@ -1,6 +1,7 @@
 import { DataSourceInstanceSettings, MetricFindValue, SelectableValue, ScopedVars } from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 import { AwsAthenaQuery, AwsAthenaOptions } from './types';
+import { format } from 'util';
 
 export class DataSource extends DataSourceWithBackend<AwsAthenaQuery, AwsAthenaOptions> {
   defaultRegion: string;
@@ -34,6 +35,12 @@ export class DataSource extends DataSourceWithBackend<AwsAthenaQuery, AwsAthenaO
     query.queryString = templateSrv.replace(query.queryString, scopedVars) || '';
     query.outputLocation = this.outputLocation;
     return query;
+  }
+
+  async getVariableQuery(query: string, region: string, workGroup: string): Promise<string[][]> {
+    return (await this.getResource('variable_query', { query: query, region: region, workGroup: workGroup }))[
+      'results'
+    ];
   }
 
   async getRegionOptions(): Promise<Array<SelectableValue<string>>> {
@@ -211,6 +218,21 @@ export class DataSource extends DataSourceWithBackend<AwsAthenaQuery, AwsAthenaO
       return queryExecutionsByName.map((n) => {
         const id = n.QueryExecutionId;
         return { text: id, value: id };
+      });
+    }
+
+    const selectQuery = query.match(/^SELECT/);
+    if (selectQuery) {
+      const results = await this.getVariableQuery(
+        templateSrv.replace(query),
+        this.defaultRegion,
+        this.defaultWorkgroup
+      );
+      return results.map((r) => {
+        if (r.length !== 1) {
+          throw new Error(format('Expected single value: %s', r));
+        }
+        return { text: r[0], value: r[0] };
       });
     }
 
