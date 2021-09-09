@@ -119,6 +119,8 @@ func (ds *AwsAthenaDatasource) CheckHealth(ctx context.Context, req *backend.Che
 }
 
 func (ds *AwsAthenaDatasource) QueryData(ctx context.Context, tsdbReq *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
+	backend.Logger.Debug("Executing queries", "len", len(tsdbReq.Queries))
+
 	responses := &backend.QueryDataResponse{
 		Responses: map[string]backend.DataResponse{},
 	}
@@ -153,15 +155,18 @@ func (ds *AwsAthenaDatasource) QueryData(ctx context.Context, tsdbReq *backend.Q
 		target.metrics = ds.metrics
 		target.datasourceID = tsdbReq.PluginContext.DataSourceInstanceSettings.ID
 
+		backend.Logger.Debug("Appending target", "queryString", target.QueryString)
 		targets = append(targets, target)
 	}
 
 	for _, target := range targets {
+		backend.Logger.Debug("Getting query results", "queryString", target.QueryString)
 		result, err := target.getQueryResults(ctx, tsdbReq.PluginContext)
 		if err != nil {
 			responses.Responses[target.RefId] = backend.DataResponse{
 				Error: err,
 			}
+			backend.Logger.Debug("Query failed", "queryString", target.QueryString, "error", err)
 			continue
 		}
 
@@ -170,6 +175,7 @@ func (ds *AwsAthenaDatasource) QueryData(ctx context.Context, tsdbReq *backend.Q
 			timeFormat = time.RFC3339Nano
 		}
 
+		backend.Logger.Debug("Parsing response", "queryString", target.QueryString)
 		if frames, err := parseResponse(result, target.RefId, target.From, target.To, target.TimestampColumn, target.ValueColumn, target.LegendFormat, timeFormat); err != nil {
 			responses.Responses[target.RefId] = backend.DataResponse{
 				Error: err,
@@ -181,6 +187,7 @@ func (ds *AwsAthenaDatasource) QueryData(ctx context.Context, tsdbReq *backend.Q
 		}
 	}
 
+	backend.Logger.Debug("Returning responses", "len", len(responses.Responses))
 	return responses, nil
 }
 
@@ -469,6 +476,7 @@ func (ds *AwsAthenaDatasource) handleVariableQuery(rw http.ResponseWriter, req *
 		return
 	}
 
+	backend.Logger.Debug("Building query", "queryString", queryStrings[0])
 	target := AwsAthenaQuery{
 		QueryString:    queryStrings[0],
 		Region:         regions[0],
@@ -495,12 +503,14 @@ func (ds *AwsAthenaDatasource) handleVariableQuery(rw http.ResponseWriter, req *
 	target.metrics = ds.metrics
 	target.datasourceID = pluginContext.DataSourceInstanceSettings.ID
 
+	backend.Logger.Debug("Getting query results", "queryString", target.QueryString)
 	results, err := target.getQueryResults(ctx, pluginContext)
 	if err != nil {
 		writeResult(rw, "?", nil, err)
 		return
 	}
 
+	backend.Logger.Debug("Parsing results", "queryString", target.QueryString)
 	rows := make([][]string, len(results.ResultSet.Rows))
 	for i, row := range results.ResultSet.Rows {
 		columns := make([]string, len(row.Data))
@@ -510,6 +520,7 @@ func (ds *AwsAthenaDatasource) handleVariableQuery(rw http.ResponseWriter, req *
 		rows[i] = columns
 	}
 
+	backend.Logger.Debug("Returning rows", "queryString", target.QueryString, "len", len(rows))
 	writeResult(rw, "results", rows, nil)
 }
 
