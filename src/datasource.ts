@@ -4,11 +4,13 @@ import { AwsAthenaQuery, AwsAthenaOptions } from './types';
 
 export class DataSource extends DataSourceWithBackend<AwsAthenaQuery, AwsAthenaOptions> {
   defaultRegion: string;
+  defaultWorkgroup: string;
   outputLocation: string;
 
   constructor(instanceSettings: DataSourceInstanceSettings<AwsAthenaOptions>) {
     super(instanceSettings);
     this.defaultRegion = instanceSettings.jsonData.defaultRegion || 'us-east-1';
+    this.defaultWorkgroup = instanceSettings.jsonData.defaultWorkgroup || '';
     this.outputLocation = instanceSettings.jsonData.outputLocation;
   }
 

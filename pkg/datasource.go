@@ -143,6 +143,11 @@ func (ds *AwsAthenaDatasource) QueryData(ctx context.Context, tsdbReq *backend.Q
 		if target.Region == "default" || target.Region == "" {
 			target.Region = dsInfo.DefaultRegion
 		}
+
+		if target.WorkGroup == "default" || target.WorkGroup == "" {
+			target.WorkGroup = dsInfo.DefaultWorkgroup
+		}
+
 		target.client = svc
 		target.cache = ds.cache
 		target.metrics = ds.metrics

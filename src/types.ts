@@ -2,6 +2,7 @@ import { DataQuery, DataSourceJsonData } from '@grafana/data';
 
 export interface AwsAthenaOptions extends DataSourceJsonData {
   defaultRegion: string;
+  defaultWorkgroup: string;
   profile: string;
   assumeRoleArn?: string;
   outputLocation: string;
