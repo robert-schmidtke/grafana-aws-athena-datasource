@@ -73,6 +73,7 @@ func (query *AwsAthenaQuery) getQueryResults(ctx context.Context, pluginContext 
 			}
 		}
 	} else {
+		backend.Logger.Debug("Getting workgroup", "queryString", query.QueryString)
 		workgroup, err := query.getWorkgroup(ctx, pluginContext, query.Region, query.WorkGroup)
 		if err != nil {
 			return nil, err
@@ -81,10 +82,12 @@ func (query *AwsAthenaQuery) getQueryResults(ctx context.Context, pluginContext 
 			return nil, fmt.Errorf("should set scan data limit")
 		}
 
+		backend.Logger.Debug("Starting query execution", "queryString", query.QueryString)
 		queryExecutionID, err := query.startQueryExecution(ctx)
 		if err != nil {
 			return nil, err
 		}
+		backend.Logger.Debug("Started query execution", "queryString", query.QueryString, "queryExecutionID", aws.String(queryExecutionID))
 
 		query.Inputs = append(query.Inputs, athena.GetQueryResultsInput{
 			QueryExecutionId: aws.String(queryExecutionID),
@@ -92,6 +95,7 @@ func (query *AwsAthenaQuery) getQueryResults(ctx context.Context, pluginContext 
 	}
 
 	// wait until query completed
+	backend.Logger.Debug("Waiting for queries", "len", len(query.waitQueryExecutionIds))
 	if len(query.waitQueryExecutionIds) > 0 {
 		if err := query.waitForQueryCompleted(ctx, query.waitQueryExecutionIds); err != nil {
 			return nil, err
@@ -105,6 +109,8 @@ func (query *AwsAthenaQuery) getQueryResults(ctx context.Context, pluginContext 
 			return nil, err
 		}
 	}
+
+	backend.Logger.Debug("Getting results output")
 	result := athena.GetQueryResultsOutput{
 		ResultSet: &athena.ResultSet{
 			Rows: make([]*athena.Row, 0),
@@ -118,10 +124,12 @@ func (query *AwsAthenaQuery) getQueryResults(ctx context.Context, pluginContext 
 
 		cacheKey := "QueryResults/" + strconv.FormatInt(pluginContext.DataSourceInstanceSettings.ID, 10) + "/" + query.Region + "/" + *input.QueryExecutionId + "/" + query.MaxRows
 		if item, _, found := query.cache.GetWithExpiration(cacheKey); found && query.CacheDuration > 0 {
+			backend.Logger.Debug("Returning results from cache", "queryExecutionID", input.QueryExecutionId)
 			if r, ok := item.(*athena.GetQueryResultsOutput); ok {
 				resp = r
 			}
 		} else {
+			backend.Logger.Debug("Getting query results", "queryExecutionID", input.QueryExecutionId)
 			err := query.client.GetQueryResultsPagesWithContext(ctx, &input,
 				func(page *athena.GetQueryResultsOutput, lastPage bool) bool {
 					query.metrics.queriesTotal.With(prometheus.Labels{"region": query.Region}).Inc()
@@ -140,6 +148,7 @@ func (query *AwsAthenaQuery) getQueryResults(ctx context.Context, pluginContext 
 			if aerr, ok := err.(awserr.Error); ok && aerr.Code() == athena.ErrCodeInvalidRequestException {
 				backend.Logger.Warn("Get Query Results Warning", "warn", aerr.Message())
 			} else if err != nil {
+				backend.Logger.Debug("Get Query Results Warning", "warn", err)
 				return nil, err
 			}
 
@@ -156,6 +165,7 @@ func (query *AwsAthenaQuery) getQueryResults(ctx context.Context, pluginContext 
 		result.ResultSet.Rows = append(result.ResultSet.Rows, resp.ResultSet.Rows[1:]...) // trim header row
 	}
 
+	backend.Logger.Debug("Returning result", "rows", result.ResultSet.Rows)
 	return &result, nil
 }
 
@@ -205,14 +215,20 @@ func (query *AwsAthenaQuery) startQueryExecution(ctx context.Context) (string, e
 }
 
 func (query *AwsAthenaQuery) waitForQueryCompleted(ctx context.Context, waitQueryExecutionIds []*string) error {
+	backend.Logger.Debug("Waiting for queries", "len", len(waitQueryExecutionIds))
+
 	for i := 0; i < QUERY_WAIT_COUNT; i++ {
 		completeCount := 0
+
+		backend.Logger.Debug("Getting execution status")
 		bi := &athena.BatchGetQueryExecutionInput{QueryExecutionIds: waitQueryExecutionIds}
 		bo, err := query.client.BatchGetQueryExecutionWithContext(ctx, bi)
 		if err != nil {
+			backend.Logger.Debug("Get execution status warning", "warn", err)
 			return err
 		}
 		for _, e := range bo.QueryExecutions {
+			backend.Logger.Debug("Got execution status", "queryExecutionID", e.QueryExecutionId, "status", *e.Status.State)
 			// TODO: add warning for FAILED or CANCELLED
 			if !(*e.Status.State == "QUEUED" || *e.Status.State == "RUNNING") {
 				completeCount++
@@ -224,6 +240,7 @@ func (query *AwsAthenaQuery) waitForQueryCompleted(ctx context.Context, waitQuer
 			}
 			break
 		} else {
+			backend.Logger.Debug("Sleeping", "expected", len(waitQueryExecutionIds), "actual", completeCount)
 			time.Sleep(1 * time.Second)
 		}
 	}
