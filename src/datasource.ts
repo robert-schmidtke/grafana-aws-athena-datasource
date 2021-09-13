@@ -221,7 +221,7 @@ export class DataSource extends DataSourceWithBackend<AwsAthenaQuery, AwsAthenaO
       });
     }
 
-    const selectQuery = query.match(/^SELECT/);
+    const selectQuery = query.match(/(^SELECT)|(^WITH)/);
     if (selectQuery) {
       const results = await this.getVariableQuery(
         templateSrv.replace(query),
