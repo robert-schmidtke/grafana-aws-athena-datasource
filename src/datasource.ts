@@ -229,10 +229,15 @@ export class DataSource extends DataSourceWithBackend<AwsAthenaQuery, AwsAthenaO
         this.defaultWorkgroup
       );
       return results.map((r) => {
-        if (r.length !== 1) {
-          throw new Error(format('Expected single value: %s', r));
+        if (r.length === 1) {
+          return { value: r[0], text: r[0] };
         }
-        return { text: r[0], value: r[0] };
+
+        if (r.length === 2) {
+          return { value: r[0], text: r[1] };
+        }
+
+        throw new Error(format('Expected one or two values: %s', r));
       });
     }
 
