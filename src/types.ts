@@ -6,6 +6,7 @@ export interface AwsAthenaOptions extends DataSourceJsonData {
   profile: string;
   assumeRoleArn?: string;
   outputLocation: string;
+  queryTimeout: string;
 }
 
 export interface AwsAthenaSecureJsonData {

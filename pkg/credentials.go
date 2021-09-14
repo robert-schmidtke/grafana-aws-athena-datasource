@@ -36,6 +36,7 @@ type DatasourceInfo struct {
 	Profile          string `json:"profile"`
 	AuthType         string `json:"authType"`
 	AssumeRoleArn    string `json:"assumeRoleArn"`
+	QueryTimeout     Duration
 
 	AccessKey string
 	SecretKey string

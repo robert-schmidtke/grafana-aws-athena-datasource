@@ -227,6 +227,17 @@ export class ConfigEditor extends PureComponent<Props> {
               </div>
             </div>
           </div>
+          <div className="gf-form-inline">
+            <div className="gf-form">
+              <InlineFormLabel className="width-14">Query Timeout</InlineFormLabel>
+              <Input
+                className="width-30"
+                placeholder="30s"
+                value={options.jsonData.queryTimeout}
+                onChange={onUpdateDatasourceJsonDataOption(this.props, 'queryTimeout')}
+              />
+            </div>
+          </div>
         </div>
       </>
     );
