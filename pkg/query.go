@@ -228,12 +228,12 @@ func (query *AwsAthenaQuery) waitForQueryCompleted(ctx context.Context, waitQuer
 				backend.Logger.Warn("Get execution status warning", "warn", err)
 				return nil
 			}
-		}
-		for _, e := range bo.QueryExecutions {
-			backend.Logger.Debug("Got execution status", "queryExecutionID", e.QueryExecutionId, "status", *e.Status.State)
-			// TODO: add warning for FAILED or CANCELLED
-			if !(*e.Status.State == "QUEUED" || *e.Status.State == "RUNNING") {
-				completeCount++
+		} else {
+			for _, e := range bo.QueryExecutions {
+				backend.Logger.Debug("Got execution status", "queryExecutionID", e.QueryExecutionId, "status", *e.Status.State)
+				if !(*e.Status.State == "QUEUED" || *e.Status.State == "RUNNING") {
+					completeCount++
+				}
 			}
 		}
 		if len(waitQueryExecutionIds) == completeCount {
