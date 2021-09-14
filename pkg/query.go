@@ -207,6 +207,7 @@ func (query *AwsAthenaQuery) startQueryExecution(ctx context.Context) (string, e
 	if item, _, found := query.cache.GetWithExpiration(cacheKey); found && query.CacheDuration > 0 {
 		if id, ok := item.(string); ok {
 			queryExecutionID = id
+			query.waitQueryExecutionIds = append(query.waitQueryExecutionIds, &queryExecutionID)
 		}
 	} else {
 		si := &athena.StartQueryExecutionInput{
