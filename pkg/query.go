@@ -226,7 +226,7 @@ func (query *AwsAthenaQuery) waitForQueryCompleted(ctx context.Context, waitQuer
 		if err != nil {
 			if err.Error() != "Query has not yet finished. Current state: RUNNING" {
 				backend.Logger.Warn("Get execution status warning", "warn", err)
-				return nil
+				return err
 			}
 		} else {
 			for _, e := range bo.QueryExecutions {
