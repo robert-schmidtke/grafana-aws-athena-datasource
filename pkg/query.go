@@ -161,9 +161,9 @@ func (query *AwsAthenaQuery) getQueryResults(ctx context.Context, pluginContext 
 					return !lastPage
 				})
 			if aerr, ok := err.(awserr.Error); ok && aerr.Code() == athena.ErrCodeInvalidRequestException {
-				backend.Logger.Warn("Get Query Results Warning", "warn", aerr.Message())
+				backend.Logger.Warn("Get Query Results Athena Warning", "warn", aerr.Message(), "queryExecutionID", input.QueryExecutionId)
 			} else if err != nil {
-				backend.Logger.Debug("Get Query Results Warning", "warn", err)
+				backend.Logger.Warn("Get Query Results Unknown Warning", "warn", err, "queryExecutionID", input.QueryExecutionId)
 				return nil, err
 			}
 
