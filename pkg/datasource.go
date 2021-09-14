@@ -43,7 +43,6 @@ var (
 const (
 	DEFAULT_MAX_ROWS          = 1000
 	AWS_API_RESULT_MAX_LENGTH = 50
-	QUERY_WAIT_COUNT          = 30
 )
 
 func init() {

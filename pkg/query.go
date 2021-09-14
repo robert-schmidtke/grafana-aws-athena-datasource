@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -94,10 +96,23 @@ func (query *AwsAthenaQuery) getQueryResults(ctx context.Context, pluginContext 
 		})
 	}
 
+	// obtain query timeout
+	dsSettings := map[string]string{}
+	json.Unmarshal(pluginContext.DataSourceInstanceSettings.JSONData, &dsSettings)
+	queryTimeoutString, present := dsSettings["queryTimeout"]
+	if !present || queryTimeoutString == "" {
+		queryTimeoutString = "30s"
+	}
+
+	queryTimeout, err := time.ParseDuration(queryTimeoutString)
+	if err != nil {
+		return nil, err
+	}
+
 	// wait until query completed
-	backend.Logger.Debug("Waiting for queries", "len", len(query.waitQueryExecutionIds))
+	backend.Logger.Debug("Waiting for queries", "len", len(query.waitQueryExecutionIds), "timeout", queryTimeout)
 	if len(query.waitQueryExecutionIds) > 0 {
-		if err := query.waitForQueryCompleted(ctx, query.waitQueryExecutionIds); err != nil {
+		if err := query.waitForQueryCompleted(ctx, query.waitQueryExecutionIds, queryTimeout); err != nil {
 			return nil, err
 		}
 	}
@@ -214,18 +229,19 @@ func (query *AwsAthenaQuery) startQueryExecution(ctx context.Context) (string, e
 	return queryExecutionID, nil
 }
 
-func (query *AwsAthenaQuery) waitForQueryCompleted(ctx context.Context, waitQueryExecutionIds []*string) error {
+func (query *AwsAthenaQuery) waitForQueryCompleted(ctx context.Context, waitQueryExecutionIds []*string, timeout time.Duration) error {
 	backend.Logger.Debug("Waiting for queries", "len", len(waitQueryExecutionIds))
 
-	for i := 0; i < QUERY_WAIT_COUNT; i++ {
+	// approximate timeout by dismissing time to obtain query executions
+	for i := 0; i < int(timeout.Seconds()); i++ {
 		completeCount := 0
 
 		backend.Logger.Debug("Getting execution status")
 		bi := &athena.BatchGetQueryExecutionInput{QueryExecutionIds: waitQueryExecutionIds}
 		bo, err := query.client.BatchGetQueryExecutionWithContext(ctx, bi)
 		if err != nil {
-			if err.Error() != "Query has not yet finished. Current state: RUNNING" {
-				backend.Logger.Warn("Get execution status warning", "warn", err)
+			if !strings.HasPrefix(err.Error(), "Query has not yet finished") {
+				backend.Logger.Warn("Get execution status warning", "warn", err, "err", err.Error())
 				return err
 			}
 		} else {
