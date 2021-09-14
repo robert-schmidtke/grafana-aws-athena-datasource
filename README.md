@@ -19,6 +19,8 @@ docker restart grafana
 ## Notable changes in this fork
 - Adds default workgroup to datasource configuration.
 - Adds support for dashboard variables, using default region and default workgroup from the datasource configuration.
+- Tolerates "Query has not yet finished"
+- Allows configuring query timeout
 - Adds a lot more debug logging.
 - Builds on Go 1.17
 - Targets Grafana 7.5.10
