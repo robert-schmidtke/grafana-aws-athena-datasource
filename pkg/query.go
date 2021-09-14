@@ -234,6 +234,10 @@ func (query *AwsAthenaQuery) waitForQueryCompleted(ctx context.Context, waitQuer
 				if !(*e.Status.State == "QUEUED" || *e.Status.State == "RUNNING") {
 					completeCount++
 				}
+
+				if *e.Status.State == "CANCELLED" || *e.Status.State == "FAILED" {
+					backend.Logger.Warn("Query did not succeed", "queryExecutionID", e.QueryExecutionId, "status", *e.Status.State)
+				}
 			}
 		}
 		if len(waitQueryExecutionIds) == completeCount {
