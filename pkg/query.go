@@ -224,8 +224,10 @@ func (query *AwsAthenaQuery) waitForQueryCompleted(ctx context.Context, waitQuer
 		bi := &athena.BatchGetQueryExecutionInput{QueryExecutionIds: waitQueryExecutionIds}
 		bo, err := query.client.BatchGetQueryExecutionWithContext(ctx, bi)
 		if err != nil {
-			backend.Logger.Debug("Get execution status warning", "warn", err)
-			return err
+			if err.Error() != "Query has not yet finished. Current state: RUNNING" {
+				backend.Logger.Warn("Get execution status warning", "warn", err)
+				return nil
+			}
 		}
 		for _, e := range bo.QueryExecutions {
 			backend.Logger.Debug("Got execution status", "queryExecutionID", e.QueryExecutionId, "status", *e.Status.State)
