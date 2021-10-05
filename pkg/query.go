@@ -168,7 +168,7 @@ func (query *AwsAthenaQuery) getQueryResults(ctx context.Context, pluginContext 
 				return nil, err
 			}
 
-			if query.CacheDuration > 0 {
+			if query.CacheDuration > 0 && resp != nil {
 				query.cache.Set(cacheKey, resp, time.Duration(query.CacheDuration)*time.Second)
 			}
 		}
