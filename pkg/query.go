@@ -87,6 +87,7 @@ func (query *AwsAthenaQuery) getQueryResults(ctx context.Context, pluginContext 
 		backend.Logger.Debug("Starting query execution", "queryString", query.QueryString)
 		queryExecutionID, err := query.startQueryExecution(ctx)
 		if err != nil {
+			query.forgetStartQueryExecution()
 			return nil, err
 		}
 		backend.Logger.Debug("Started query execution", "queryString", query.QueryString, "queryExecutionID", aws.String(queryExecutionID))
@@ -106,6 +107,7 @@ func (query *AwsAthenaQuery) getQueryResults(ctx context.Context, pluginContext 
 
 	queryTimeout, err := time.ParseDuration(queryTimeoutString)
 	if err != nil {
+		query.forgetStartQueryExecution()
 		return nil, err
 	}
 
@@ -113,6 +115,7 @@ func (query *AwsAthenaQuery) getQueryResults(ctx context.Context, pluginContext 
 	backend.Logger.Debug("Waiting for queries", "len", len(query.waitQueryExecutionIds), "timeout", queryTimeout)
 	if len(query.waitQueryExecutionIds) > 0 {
 		if err := query.waitForQueryCompleted(ctx, query.waitQueryExecutionIds, queryTimeout); err != nil {
+			query.forgetStartQueryExecution()
 			return nil, err
 		}
 	}
@@ -121,6 +124,7 @@ func (query *AwsAthenaQuery) getQueryResults(ctx context.Context, pluginContext 
 	if query.MaxRows != "" {
 		maxRows, err = strconv.ParseInt(query.MaxRows, 10, 64)
 		if err != nil {
+			query.forgetStartQueryExecution()
 			return nil, err
 		}
 	}
@@ -162,9 +166,11 @@ func (query *AwsAthenaQuery) getQueryResults(ctx context.Context, pluginContext 
 				})
 			if aerr, ok := err.(awserr.Error); ok && aerr.Code() == athena.ErrCodeInvalidRequestException {
 				backend.Logger.Warn("Get Query Results Athena Warning", "warn", aerr.Message(), "queryExecutionID", input.QueryExecutionId)
+				query.forgetStartQueryExecution()
 				return nil, err
 			} else if err != nil {
 				backend.Logger.Warn("Get Query Results Unknown Warning", "warn", err, "queryExecutionID", input.QueryExecutionId)
+				query.forgetStartQueryExecution()
 				return nil, err
 			}
 
@@ -229,6 +235,11 @@ func (query *AwsAthenaQuery) startQueryExecution(ctx context.Context) (string, e
 		query.waitQueryExecutionIds = append(query.waitQueryExecutionIds, &queryExecutionID)
 	}
 	return queryExecutionID, nil
+}
+
+func (query *AwsAthenaQuery) forgetStartQueryExecution() {
+	cacheKey := "StartQueryExecution/" + strconv.FormatInt(query.datasourceID, 10) + "/" + query.Region + "/" + query.QueryString + "/" + query.MaxRows
+	query.cache.Delete(cacheKey)
 }
 
 func (query *AwsAthenaQuery) waitForQueryCompleted(ctx context.Context, waitQueryExecutionIds []*string, timeout time.Duration) error {
