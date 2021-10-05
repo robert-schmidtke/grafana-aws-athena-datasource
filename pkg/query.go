@@ -162,6 +162,7 @@ func (query *AwsAthenaQuery) getQueryResults(ctx context.Context, pluginContext 
 				})
 			if aerr, ok := err.(awserr.Error); ok && aerr.Code() == athena.ErrCodeInvalidRequestException {
 				backend.Logger.Warn("Get Query Results Athena Warning", "warn", aerr.Message(), "queryExecutionID", input.QueryExecutionId)
+				return nil, err
 			} else if err != nil {
 				backend.Logger.Warn("Get Query Results Unknown Warning", "warn", err, "queryExecutionID", input.QueryExecutionId)
 				return nil, err
