@@ -39,9 +39,7 @@ type AwsAthenaQuery struct {
 	To                    time.Time
 }
 
-func (query *AwsAthenaQuery) getQueryResults(ctx context.Context, pluginContext backend.PluginContext) (*athena.GetQueryResultsOutput, error) {
-	var err error
-
+func (query *AwsAthenaQuery) submitQuery(ctx context.Context, pluginContext backend.PluginContext) error {
 	if query.QueryString == "" {
 		dedupe := true // TODO: add query option?
 		if dedupe {
@@ -57,7 +55,7 @@ func (query *AwsAthenaQuery) getQueryResults(ctx context.Context, pluginContext 
 					backend.Logger.Warn("Batch Get Query Execution Warning", "warn", aerr.Message())
 					bo = &athena.BatchGetQueryExecutionOutput{QueryExecutions: make([]*athena.QueryExecution, 0)}
 				} else if err != nil {
-					return nil, err
+					return err
 				}
 				allQueryExecution = append(allQueryExecution, bo.QueryExecutions...)
 			}
@@ -78,17 +76,17 @@ func (query *AwsAthenaQuery) getQueryResults(ctx context.Context, pluginContext 
 		backend.Logger.Debug("Getting workgroup", "queryString", query.QueryString)
 		workgroup, err := query.getWorkgroup(ctx, pluginContext, query.Region, query.WorkGroup)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if workgroup.WorkGroup.Configuration.BytesScannedCutoffPerQuery == nil {
-			return nil, fmt.Errorf("should set scan data limit")
+			return fmt.Errorf("should set scan data limit")
 		}
 
 		backend.Logger.Debug("Starting query execution", "queryString", query.QueryString)
 		queryExecutionID, err := query.startQueryExecution(ctx)
 		if err != nil {
 			query.forgetStartQueryExecution()
-			return nil, err
+			return err
 		}
 		backend.Logger.Debug("Started query execution", "queryString", query.QueryString, "queryExecutionID", aws.String(queryExecutionID))
 
@@ -97,6 +95,10 @@ func (query *AwsAthenaQuery) getQueryResults(ctx context.Context, pluginContext 
 		})
 	}
 
+	return nil
+}
+
+func (query *AwsAthenaQuery) waitQuery(ctx context.Context, pluginContext backend.PluginContext, additionalQueries []AwsAthenaQuery) error {
 	// obtain query timeout
 	dsSettings := map[string]string{}
 	json.Unmarshal(pluginContext.DataSourceInstanceSettings.JSONData, &dsSettings)
@@ -108,17 +110,34 @@ func (query *AwsAthenaQuery) getQueryResults(ctx context.Context, pluginContext 
 	queryTimeout, err := time.ParseDuration(queryTimeoutString)
 	if err != nil {
 		query.forgetStartQueryExecution()
-		return nil, err
+		return err
+	}
+
+	waitQueryExecutionIds := make([]*string, 0)
+	waitQueryExecutionIds = append(waitQueryExecutionIds, query.waitQueryExecutionIds...)
+
+	for _, additionalQuery := range additionalQueries {
+		waitQueryExecutionIds = append(waitQueryExecutionIds, additionalQuery.waitQueryExecutionIds...)
 	}
 
 	// wait until query completed
-	backend.Logger.Debug("Waiting for queries", "len", len(query.waitQueryExecutionIds), "timeout", queryTimeout)
-	if len(query.waitQueryExecutionIds) > 0 {
-		if err := query.waitForQueryCompleted(ctx, query.waitQueryExecutionIds, queryTimeout); err != nil {
+	backend.Logger.Debug("Waiting for queries", "len", len(waitQueryExecutionIds), "timeout", queryTimeout)
+	if len(waitQueryExecutionIds) > 0 {
+		if err := query.waitForQueryCompleted(ctx, waitQueryExecutionIds, queryTimeout); err != nil {
 			query.forgetStartQueryExecution()
-			return nil, err
+			for _, additionalQuery := range additionalQueries {
+				additionalQuery.forgetStartQueryExecution()
+			}
+
+			return err
 		}
 	}
+
+	return nil
+}
+
+func (query *AwsAthenaQuery) obtainQueryResults(ctx context.Context, pluginContext backend.PluginContext) (*athena.GetQueryResultsOutput, error) {
+	var err error
 
 	maxRows := int64(DEFAULT_MAX_ROWS)
 	if query.MaxRows != "" {
@@ -187,8 +206,29 @@ func (query *AwsAthenaQuery) getQueryResults(ctx context.Context, pluginContext 
 		result.ResultSet.Rows = append(result.ResultSet.Rows, resp.ResultSet.Rows[1:]...) // trim header row
 	}
 
-	backend.Logger.Debug("Returning result", "rows", result.ResultSet.Rows)
+	backend.Logger.Debug("Returning result", "rows", len(result.ResultSet.Rows))
 	return &result, nil
+}
+
+func (query *AwsAthenaQuery) getQueryResults(ctx context.Context, pluginContext backend.PluginContext) (*athena.GetQueryResultsOutput, error) {
+	var err error
+
+	err = query.submitQuery(ctx, pluginContext)
+	if err != nil {
+		return nil, err
+	}
+
+	err = query.waitQuery(ctx, pluginContext, []AwsAthenaQuery{})
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := query.obtainQueryResults(ctx, pluginContext)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
 func (query *AwsAthenaQuery) getWorkgroup(ctx context.Context, pluginContext backend.PluginContext, region string, workGroup string) (*athena.GetWorkGroupOutput, error) {
