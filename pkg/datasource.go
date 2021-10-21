@@ -158,30 +158,44 @@ func (ds *AwsAthenaDatasource) QueryData(ctx context.Context, tsdbReq *backend.Q
 		targets = append(targets, target)
 	}
 
-	for _, target := range targets {
-		backend.Logger.Debug("Getting query results", "queryString", target.QueryString)
-		result, err := target.getQueryResults(ctx, tsdbReq.PluginContext)
+	backend.Logger.Debug("Starting query executions", "len", len(targets))
+	for i := 0; i < len(targets); i++ {
+		err := targets[i].submitQuery(ctx, tsdbReq.PluginContext)
 		if err != nil {
-			responses.Responses[target.RefId] = backend.DataResponse{
+			return nil, err
+		}
+	}
+
+	backend.Logger.Debug("Waiting for query executions", "len", len(targets))
+	err := targets[0].waitQuery(ctx, tsdbReq.PluginContext, targets[1:])
+	if err != nil {
+		return nil, err
+	}
+
+	for i := 0; i < len(targets); i++ {
+		backend.Logger.Debug("Getting query results", "queryString", targets[i].QueryString)
+		result, err := targets[i].obtainQueryResults(ctx, tsdbReq.PluginContext)
+		if err != nil {
+			responses.Responses[targets[i].RefId] = backend.DataResponse{
 				Error: err,
 			}
-			backend.Logger.Debug("Query failed", "queryString", target.QueryString, "error", err)
+			backend.Logger.Debug("Query failed", "queryString", targets[i].QueryString, "error", err)
 			continue
 		}
 
-		timeFormat := target.TimeFormat
+		timeFormat := targets[i].TimeFormat
 		if timeFormat == "" {
 			timeFormat = time.RFC3339Nano
 		}
 
-		backend.Logger.Debug("Parsing response", "queryString", target.QueryString)
-		if frames, err := parseResponse(result, target.RefId, target.From, target.To, target.TimestampColumn, target.ValueColumn, target.LegendFormat, timeFormat); err != nil {
-			responses.Responses[target.RefId] = backend.DataResponse{
+		backend.Logger.Debug("Parsing response", "queryString", targets[i].QueryString)
+		if frames, err := parseResponse(result, targets[i].RefId, targets[i].From, targets[i].To, targets[i].TimestampColumn, targets[i].ValueColumn, targets[i].LegendFormat, timeFormat); err != nil {
+			responses.Responses[targets[i].RefId] = backend.DataResponse{
 				Error: err,
 			}
 		} else {
-			responses.Responses[target.RefId] = backend.DataResponse{
-				Frames: append(responses.Responses[target.RefId].Frames, frames...),
+			responses.Responses[targets[i].RefId] = backend.DataResponse{
+				Frames: append(responses.Responses[targets[i].RefId].Frames, frames...),
 			}
 		}
 	}
