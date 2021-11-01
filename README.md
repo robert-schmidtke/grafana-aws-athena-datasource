@@ -24,6 +24,8 @@ docker restart grafana
 - Waits for query execution IDs if they're cached (prevents warnings/no data when running+caching same query multiple times concurrently)
 - Removes failed query executions from cache so they can be retried
 - Parallelizes execution of multiple targets
+- Tolerate throttling somewhat
+- Do not always use batch get of execution status to save on API calls
 - Adds a lot more debug logging.
 - Builds on Go 1.17
 - Targets Grafana 7.5.10
