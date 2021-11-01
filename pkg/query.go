@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"math/rand"
 	"strconv"
 	"strings"
 	"time"
@@ -264,11 +265,28 @@ func (query *AwsAthenaQuery) startQueryExecution(ctx context.Context) (string, e
 				OutputLocation: aws.String(query.OutputLocation),
 			},
 		}
-		so, err := query.client.StartQueryExecutionWithContext(ctx, si)
-		if err != nil {
-			return "", err
+
+		retries := 3
+		for i := 0; i < retries; i++ {
+			so, err := query.client.StartQueryExecutionWithContext(ctx, si)
+			if err != nil {
+				if i < retries-1 {
+					// tolerate being throttled by sleeping randomly up to two seconds
+					if strings.HasPrefix(err.Error(), "TooManyRequestsException") || strings.HasPrefix(err.Error(), "ThrottlingException") {
+						backend.Logger.Warn("Tolerating exception", "err", err)
+						time.Sleep(time.Duration(rand.Float32()*2) * time.Second)
+					} else {
+						return "", err
+					}
+				} else {
+					return "", err
+				}
+			} else {
+				queryExecutionID = *so.QueryExecutionId
+				break
+			}
 		}
-		queryExecutionID = *so.QueryExecutionId
+
 		if query.CacheDuration > 0 {
 			query.cache.Set(cacheKey, queryExecutionID, time.Duration(query.CacheDuration)*time.Second)
 		}
