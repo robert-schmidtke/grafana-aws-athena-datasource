@@ -301,22 +301,51 @@ func (query *AwsAthenaQuery) forgetStartQueryExecution() {
 }
 
 func (query *AwsAthenaQuery) waitForQueryCompleted(ctx context.Context, waitQueryExecutionIds []*string, timeout time.Duration) error {
+	var err error
 	backend.Logger.Debug("Waiting for queries", "len", len(waitQueryExecutionIds))
 
 	// approximate timeout by dismissing time to obtain query executions
 	for i := 0; i < int(timeout.Seconds()); i++ {
 		completeCount := 0
 
-		backend.Logger.Debug("Getting execution status")
-		bi := &athena.BatchGetQueryExecutionInput{QueryExecutionIds: waitQueryExecutionIds}
-		bo, err := query.client.BatchGetQueryExecutionWithContext(ctx, bi)
+		// use regular get for single queries due to higher call rate limit
+		queryExecutions := make([]*athena.QueryExecution, 0)
+		if len(waitQueryExecutionIds) == 1 {
+			backend.Logger.Debug("Getting single execution status")
+
+			input := &athena.GetQueryExecutionInput{QueryExecutionId: waitQueryExecutionIds[0]}
+			var output *athena.GetQueryExecutionOutput
+			output, err = query.client.GetQueryExecutionWithContext(ctx, input)
+			if err == nil {
+				queryExecutions = append(queryExecutions, output.QueryExecution)
+			}
+		} else {
+			backend.Logger.Debug("Getting batch execution status", "len", len(waitQueryExecutionIds))
+
+			batchInput := &athena.BatchGetQueryExecutionInput{QueryExecutionIds: waitQueryExecutionIds}
+			var batchOutput *athena.BatchGetQueryExecutionOutput
+			batchOutput, err = query.client.BatchGetQueryExecutionWithContext(ctx, batchInput)
+			if err == nil {
+				queryExecutions = append(queryExecutions, batchOutput.QueryExecutions...)
+			}
+		}
+
 		if err != nil {
-			if !strings.HasPrefix(err.Error(), "Query has not yet finished") {
+			// tolerate some errors, sleeping randomly up to two seconds upon throttling
+			if strings.HasPrefix(err.Error(), "Query has not yet finished") {
+				backend.Logger.Debug("Tolerating query not yet finished", "err", err)
+			} else if strings.HasPrefix(err.Error(), "ThrottlingException") {
+				backend.Logger.Warn("Tolerating ThrottlingException", "err", err)
+				time.Sleep(time.Duration(rand.Float32()*2) * time.Second)
+			} else if strings.HasPrefix(err.Error(), "TooManyRequestsException") {
+				backend.Logger.Warn("Tolerating TooManyRequestsException", "err", err)
+				time.Sleep(time.Duration(rand.Float32()*2) * time.Second)
+			} else {
 				backend.Logger.Warn("Get execution status warning", "warn", err, "err", err.Error())
 				return err
 			}
 		} else {
-			for _, e := range bo.QueryExecutions {
+			for _, e := range queryExecutions {
 				backend.Logger.Debug("Got execution status", "queryExecutionID", e.QueryExecutionId, "status", *e.Status.State)
 				if !(*e.Status.State == "QUEUED" || *e.Status.State == "RUNNING") {
 					completeCount++
@@ -328,7 +357,7 @@ func (query *AwsAthenaQuery) waitForQueryCompleted(ctx context.Context, waitQuer
 			}
 		}
 		if len(waitQueryExecutionIds) == completeCount {
-			for _, e := range bo.QueryExecutions {
+			for _, e := range queryExecutions {
 				query.metrics.dataScannedBytesTotal.With(prometheus.Labels{"region": query.Region}).Add(float64(*e.Statistics.DataScannedInBytes))
 			}
 			break
