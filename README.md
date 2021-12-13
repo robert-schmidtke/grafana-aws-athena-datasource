@@ -23,6 +23,7 @@ docker restart grafana
 - Allows configuring query timeout
 - Waits for query execution IDs if they're cached (prevents warnings/no data when running+caching same query multiple times concurrently)
 - Removes failed query executions from cache so they can be retried
+- Does not cache empty query results
 - Parallelizes execution of multiple targets
 - Tolerate throttling somewhat
 - Do not always use batch get of execution status to save on API calls
